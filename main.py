@@ -1,12 +1,20 @@
 import telebot
 import requests
+import time
 from bs4 import BeautifulSoup
 
-URL = 'https://1xstavka.ru/live/Table-Tennis/2064427-Masters/'
+URL = ['https://1xstavka.ru/live/Table-Tennis/2178512-Winners-League/',
+ 'https://1xstavka.ru/live/Table-Tennis/1792858-Win-Cup/',
+ 'https://1xstavka.ru/live/Table-Tennis/1197285-TT-Cup/',
+ 'https://1xstavka.ru/live/Table-Tennis/1733171-Setka-Cup/',
+ 'https://1xstavka.ru/live/Table-Tennis/1691055-Pro-League/']
+
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.146 Safari/537.36',
            'accept': '*/*'}
 HOST = 'https://1xstavka.ru/'
-
+POROG = 5  # пороговый счет в партии
+POROGKOEF = 1.4  # пороговый коэффициент
+CHECKEND = 0  # признак выхода из цикла запросов
 
 def get_html(url, params = None):
     r = requests.get(url, headers=HEADERS, params=params)
@@ -19,39 +27,114 @@ def get_content(html):
     # print(items)
     matches = []
     for item in items:
-        # счёт по сетам
-        set = item.find_all('span', class_='c-events-scoreboard__cell c-events-scoreboard__cell--all')
-        if len(set) == 0:
-            set_text1 = '0'
-            set_text2 = '0'
-        else:
-            set_text1 = set[0].get_text()
-            set_text2 = set[1].get_text()
         # линии со счётом в сетах
+        # первая линия
         schetlines = item.find_all('div', class_='c-events-scoreboard__line')
+        schetline1 = schetlines[0].get_text().split('\n')
+        schetline1.pop()  # убираем последний пустой элемент
+        schetline1.remove(schetline1[0]) # убираем пустые элементы сначала
+        schetline1.remove(schetline1[0])
+        schetline1.remove(schetline1[0])
+        if len(schetline1) == 1:
+            set1 = '0'
+        else:
+            set1 = schetline1.pop(0)  # первый элемент - победы в сетах, удаляем и присваиваем в set
+        # вторая линия
+        schetline2 = schetlines[1].get_text().split('\n')
+        schetline2.pop()
+        schetline2.remove(schetline2[0])
+        schetline2.remove(schetline2[0])
+        schetline2.remove(schetline2[0])
+        if len(schetline2) == 1:
+            set2 = '0'
+        else:
+            set2 = schetline2.pop(0)  # первый элемент - победы в сетах, удаляем и присваиваем в set
+
+
         # коэффициенты
-        bets = item.find('div', class_='c-bets')
+        bets = item.find('div', class_='c-bets').get_text().split('\n')
+        bet1 = bets[2]
+        bet2 = bets[8]
         matches.append(
         {
             'Title': item.find('span', class_="n").get_text(),
             'Link': HOST + item.find('a', class_='c-events__name').get('href'),
-            'set': set_text1 + '--' + set_text2,
-            'schetline1': schetlines[0].get_text().replace('\n', ' '),
-            'schetline2': schetlines[1].get_text().replace('\n', ' '),
-            'bets': bets.get_text().replace('\n', ' ')
-
+            'set1': set1,
+            'set2': set2,
+            'schetline1': schetline1,
+            'schetline2': schetline2,
+            'bet1': bet1,
+            'bet2': bet2
         }
         )
     return matches
 
 
-def parse():
-    html = get_html(URL)
-    if html.status_code == 200:
-        matches = get_content(html.text)
+def proverka_na_pobedu(match):
+
+    if match.get('bet1') == '-' or match.get('bet2') == '-':
+        return -1
+
+    if float(match.get('bet1')) >= POROGKOEF:
+        if int(match.get('set1')) == 1 and int(match.get('set2')) == 0:
+            if int(match.get('schetline2')[0]) <= POROG:
+                res1 = 'sledim'  # на слежение
+            else:
+                res1 = 'pas'
+        elif int(match.get('set1')) == 2 and int(match.get('set2')) == 0:
+            if int(match.get('schetline2')[0]) <= POROG and int(match.get('schetline2')[1]) <= POROG:
+                res1 = 'stavka'  # на ставку
+            else:
+                res1 = 'pas'
+        else:
+            res1 = 'pas'
     else:
-        return 'Error'
+        res1 = 'pas'
+
+    if float(match.get('bet2')) >= POROGKOEF:
+        if int(match.get('set2')) == 1 and int(match.get('set1')) == 0:
+            if int(match.get('schetline1')[0]) <= POROG:
+                res2 = 'sledim'  # на слежение
+            else:
+                res2 = 'pas'
+        elif int(match.get('set2')) == 2 and int(match.get('set1')) == 0:
+            if int(match.get('schetline1')[0]) <= POROG and int(match.get('schetline1')[1]) <= POROG:
+                res2 = 'stavka'  # на ставку
+            else:
+                res2 = 'pas'
+        else:
+            res2 = 'pas'
+    else:
+        res2 = 'pas'
+
+    if res1 == 'stavka':
+        return 1
+    elif res2 == 'stavka':
+        return 2
+    elif res1 == 'sledim':
+        return 11
+    elif res2 == 'sledim':
+        return 22
+    else:
+        return -1
+
+
+def parse():
+    matches = []
+    for url in URL:
+        html = get_html(url)
+        if html.status_code == 200:
+            mat = get_content(html.text)
+            matches += mat
+    print('запрос')
     return matches
+
+
+def loop_zapros():
+    while 1:
+        bot.send_message(362390015, 'проверка')
+
+        time.sleep(4)
 
 
 bot = telebot.TeleBot('1699645072:AAGE3eWMl-spPf7vCJNphWQFQMUlz6k6D4A')
@@ -78,21 +161,25 @@ def start_message(message):
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
+    print(message.text)
     if message.text.lower() == 'привет':
-        bot.send_message(message.chat.id, 'Привет, мой создатель')
-    elif message.text.lower() == 'пока':
-        bot.send_message(message.chat.id, 'Прощай, создатель')
-    elif message.text.lower() == 'матчи':
+        bot.send_message(message.chat.id, 'Привет, Поросенок')
+    elif message.text.lower() == 'старт':
+        loop_zapros()
+    elif message.text.lower() == 'test':
         matches = parse()
         for match in matches:
-            bot.send_message(message.chat.id, 'Мастерс' + match.get('Title'))
-            bot.send_message(message.chat.id, match.get('Link'))
-            bot.send_message(message.chat.id, 'счёт по сетам ' + match.get('set'))
-            bot.send_message(message.chat.id, 'счёт в сетах 1-го' + match.get('schetline1'))
-            bot.send_message(message.chat.id, 'счёт в сетах 2-го' + match.get('schetline2'))
-            bot.send_message(message.chat.id, 'какие-то коэффициенты' + match.get('bets'))
-
+            bot.send_message(message.chat.id,
+                             match.get('Title') + '\n' +
+                             match.get('Link') + '\n' +
+                             'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
+                             'Счёт в сетах 1-го: ' + ''.join(str(e + '\t') for e in match.get('schetline1')) + '\n' +
+                             'Счёт в сетах 2-го: ' + ''.join(str(e + '\t') for e in match.get('schetline2')) + '\n' +
+                             'П1 = ' + match.get('bet1') + '\n' +
+                             'П2 = ' + match.get('bet2')
+                             )
 
 
 
 bot.polling()
+
