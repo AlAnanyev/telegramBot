@@ -17,7 +17,7 @@ HOST = 'https://1xstavka.ru/'
 POROGWINSET = 7  # пороговый счет в партии
 POROGKOEF = 1.2  # пороговый коэффициент
 ENDCOMMAND = 0  # команда завершения работы парсера
-SIGNAL = 1  # команда на вывод всех сигналов
+SIGNAL = 1  # команда на вывод только на победу
 PRIZNAKRABOTY = 0
 IDMEMBERS = [-1001323622532, 362390015]
 
@@ -125,6 +125,7 @@ def proverka_na_pobedu(match):
         return -1
 
 
+
 def parse():
     matches = []  # список матчей
     for url in URL:
@@ -145,39 +146,33 @@ def loop_zapros():
         print('запрос')
         matches = parse()
         for match in matches:
-            result_proverki = proverka_na_pobedu(match)
+            result_proverki_pobeda = proverka_na_pobedu(match)
             if SIGNAL == 1:
-                if result_proverki == 1 or result_proverki == 2:
-                    bot.send_message(-1001323622532,
-                                 match.get('Title') + '\n' +
-                                 match.get('Link') + '\n' +
-                                 'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
-                                 'Счёт в сетах 1-го: ' + ''.join(
-                                     str(e + '\t') for e in match.get('schetline1')) + '\n' +
-                                 'Счёт в сетах 2-го: ' + ''.join(
-                                     str(e + '\t') for e in match.get('schetline2')) + '\n' +
-                                 'П1 = ' + match.get('bet1') + '\n' +
-                                 'П2 = ' + match.get('bet2')
-                                 )
+                if result_proverki_pobeda == 1 or result_proverki_pobeda == 2:
+                    forma_message(match)
             elif SIGNAL == -1:
-                if result_proverki != -1:
-                    bot.send_message(-1001323622532,
-                                 match.get('Title') + '\n' +
-                                 match.get('Link') + '\n' +
-                                 'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
-                                 'Счёт в сетах 1-го: ' + ''.join(
-                                     str(e + '\t') for e in match.get('schetline1')) + '\n' +
-                                 'Счёт в сетах 2-го: ' + ''.join(
-                                     str(e + '\t') for e in match.get('schetline2')) + '\n' +
-                                 'П1 = ' + match.get('bet1') + '\n' +
-                                 'П2 = ' + match.get('bet2')
-                                 )
+                if result_proverki_pobeda != -1:
+                    forma_message(match)
         # bot.send_message(362390015, 'проверка')
         print('     конец запроса')
         time.sleep(0)
     ENDCOMMAND = 0
     PRIZNAKRABOTY = 0
     return 1
+
+
+def forma_message(match):
+    bot.send_message(-1001323622532,
+                     match.get('Title') + '\n' +
+                     match.get('Link') + '\n' +
+                     'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
+                     'Счёт в сетах 1-го: ' + ''.join(
+                         str(e + '\t') for e in match.get('schetline1')) + '\n' +
+                     'Счёт в сетах 2-го: ' + ''.join(
+                         str(e + '\t') for e in match.get('schetline2')) + '\n' +
+                     'П1 = ' + match.get('bet1') + '\n' +
+                     'П2 = ' + match.get('bet2')
+                     )
 
 bot = telebot.TeleBot('1699645072:AAGE3eWMl-spPf7vCJNphWQFQMUlz6k6D4A')
 
@@ -230,12 +225,16 @@ def start_message(message):
     button_koef = types.InlineKeyboardButton(text='Текущий пороговый коэффициент', callback_data='koef')
     button_winset = types.InlineKeyboardButton(text='Текущий порог по победам соперника в партии', callback_data='winset')
     button_stop_parser = types.InlineKeyboardButton(text='Остановка работы парсера', callback_data='stop_parser')
-    keyboard.add(button_start_parser, button_koef, button_winset,button_stop_parser)
+    button_vse_match = types.InlineKeyboardButton(text='Вывод матчей которые на рассмотрении', callback_data='vse')
+    button_na_stavku = types.InlineKeyboardButton(text='Вывод матчей на ставку', callback_data='stavka')
+
+    keyboard.add(button_start_parser, button_koef, button_winset,button_stop_parser, button_vse_match, button_na_stavku)
     bot.send_message(message.chat.id, 'Команды', reply_markup=keyboard)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
+    global SIGNAL
     if call.data == "koef":
         bot.send_message(call.message.chat.id,
                          'Сейчас порог по коэффициенту = ' + str(POROGKOEF) + '. Чтобы поменять введи koef_<значение>')
@@ -251,8 +250,12 @@ def callback_worker(call):
     elif call.data == 'stop_parser':
         global ENDCOMMAND
         ENDCOMMAND = 1
-
-
+    elif call.data == 'vse':
+        SIGNAL = -1
+        bot.send_message(call.message.chat.id, 'выводятся все матчи')
+    elif call.data == 'stavka':
+        SIGNAL = 1
+        bot.send_message(call.message.chat.id, 'выводятся только матчи на ставку')
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
