@@ -5,13 +5,12 @@ from telebot import types
 from bs4 import BeautifulSoup
 
 
-URL = ['https://1xstavka.ru/live/Table-Tennis/2178512-Winners-League/',
- 'https://1xstavka.ru/live/Table-Tennis/1792858-Win-Cup/',
- 'https://1xstavka.ru/live/Table-Tennis/1197285-TT-Cup/',
- 'https://1xstavka.ru/live/Table-Tennis/1733171-Setka-Cup/',
- 'https://1xstavka.ru/live/Table-Tennis/1691055-Pro-League/']
+URL = ['https://1xstavka.ru/live/Table-Tennis/2178512-Winners-League/', 'https://1xstavka.ru/live/Table-Tennis/1792858-Win-Cup/',
+       'https://1xstavka.ru/live/Table-Tennis/1197285-TT-Cup/', 'https://1xstavka.ru/live/Table-Tennis/1733171-Setka-Cup/',
+       'https://1xstavka.ru/live/Table-Tennis/1691055-Pro-League/']
 
-HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.146 Safari/537.36',
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                         'Chrome/88.0.4324.146 Safari/537.36',
            'accept': '*/*'}
 HOST = 'https://1xstavka.ru/'
 POROGWINSET = 7  # пороговый счет в партии
@@ -20,6 +19,7 @@ ENDCOMMAND = 0  # команда завершения работы парсер�
 SIGNAL = 1  # команда на вывод только на победу
 PRIZNAKRABOTY = 0
 IDMEMBERS = [-1001323622532, 362390015]
+
 
 def get_html(url, params=None):  # реквест, получение ответа
     r = requests.get(url, headers=HEADERS, params=params)
@@ -75,7 +75,7 @@ def get_content(html):
     return matches
 
 
-def proverka_na_pobedu(match):
+def proverka_na_pobedu(match):   # основная проверка матча
 
     if match.get('bet1') == '-' or match.get('bet2') == '-': # условие для коэфиц. без значений
         return -1
@@ -125,14 +125,13 @@ def proverka_na_pobedu(match):
         return -1
 
 
-
 def parse():
     matches = []  # список матчей
     for url in URL:
-        html = get_html(url)
-        if html.status_code == 200:
-            mat = get_content(html.text)
-            matches += mat
+        html = get_html(url)  # получение html кода
+        if html.status_code == 200:  # получение ответа от страницы
+            mat = get_content(html.text)  # получение контента страницы
+            matches += mat   # добавление результатов в общий список
     return matches
 
 
@@ -140,11 +139,12 @@ def loop_zapros():
     global ENDCOMMAND
     global PRIZNAKRABOTY
     if PRIZNAKRABOTY == 1:
-        return -1
+        return -1  # выходим если парсер уже работает
     while ENDCOMMAND != 1:
         PRIZNAKRABOTY = 1
+        start_time = time.time()  # старт замера времени
         print('запрос')
-        matches = parse()
+        matches = parse()  # получение списка матчей
         for match in matches:
             result_proverki_pobeda = proverka_na_pobedu(match)
             if SIGNAL == 1:
@@ -154,15 +154,15 @@ def loop_zapros():
                 if result_proverki_pobeda != -1:
                     forma_message(match)
         # bot.send_message(362390015, 'проверка')
-        print('     конец запроса')
-        time.sleep(0)
-    ENDCOMMAND = 0
-    PRIZNAKRABOTY = 0
-    return 1
+        print('     конец запроса', "--- %s seconds ---" % (time.time() - start_time))
+        time.sleep(0)  # время задержки между запросами
+    ENDCOMMAND = 0  # обнуление команды на окончание работы парсера
+    PRIZNAKRABOTY = 0  # обнуление признака работы парсера
+    return 1  # успешное завершение работы
 
 
-def forma_message(match):
-    bot.send_message(-1001323622532,
+def forma_message(match):  # форма отправки сообщений адресатам
+    bot.send_message(IDMEMBERS[0],
                      match.get('Title') + '\n' +
                      match.get('Link') + '\n' +
                      'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
@@ -177,6 +177,7 @@ def forma_message(match):
 bot = telebot.TeleBot('1699645072:AAGE3eWMl-spPf7vCJNphWQFQMUlz6k6D4A')
 
 
+# Далее описание работы телеграмм бота
 
 @bot.message_handler(commands=['start_parser'])
 def start_message(message):
@@ -190,7 +191,7 @@ def start_message(message):
 @bot.message_handler(commands=['stop_parser'])
 def start_message(message):
     global ENDCOMMAND
-    ENDCOMMAND = 1
+    ENDCOMMAND = 1   # установка команды на окончание работы парсера
     #  bot.send_message(message.chat.id, 'Парсер остановлен')
 
 
@@ -220,15 +221,14 @@ def start_message(message):
 
 @bot.message_handler(commands=['HP'])  # вывод вспомогательных кнопок по команде /Help
 def start_message(message):
-    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard = types.InlineKeyboardMarkup(row_width=1)  # обьявление окна экранных кнопок
     button_start_parser = types.InlineKeyboardButton(text='Старт работы парсера', callback_data='start_parser')
     button_koef = types.InlineKeyboardButton(text='Текущий пороговый коэффициент', callback_data='koef')
     button_winset = types.InlineKeyboardButton(text='Текущий порог по победам соперника в партии', callback_data='winset')
     button_stop_parser = types.InlineKeyboardButton(text='Остановка работы парсера', callback_data='stop_parser')
     button_vse_match = types.InlineKeyboardButton(text='Вывод матчей которые на рассмотрении', callback_data='vse')
     button_na_stavku = types.InlineKeyboardButton(text='Вывод матчей на ставку', callback_data='stavka')
-
-    keyboard.add(button_start_parser, button_koef, button_winset,button_stop_parser, button_vse_match, button_na_stavku)
+    keyboard.add(button_start_parser, button_koef, button_winset,button_stop_parser, button_vse_match, button_na_stavku)  # добавление кнопок в окно
     bot.send_message(message.chat.id, 'Команды', reply_markup=keyboard)
 
 
