@@ -18,6 +18,8 @@ POROGKOEF = 1.4  # пороговый коэффициент
 ENDCOMMAND = 0  # команда завершения работы парсера
 SIGNAL = -1 # команда на вывод всех сигналов
 
+IDMEMBERS = [-1001323622532, 362390015]
+
 def get_html(url, params=None):  # реквест, получение ответа
     r = requests.get(url, headers=HEADERS, params=params)
     return r
@@ -141,7 +143,7 @@ def loop_zapros():
             result_proverki = proverka_na_pobedu(match)
             if SIGNAL == 1:
                 if result_proverki == 1 or result_proverki == 2:
-                    bot.send_message(362390015,
+                    bot.send_message(-1001323622532,
                                  match.get('Title') + '\n' +
                                  match.get('Link') + '\n' +
                                  'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
@@ -154,7 +156,7 @@ def loop_zapros():
                                  )
             elif SIGNAL == -1:
                 if result_proverki != -1:
-                    bot.send_message(362390015,
+                    bot.send_message(-1001323622532,
                                  match.get('Title') + '\n' +
                                  match.get('Link') + '\n' +
                                  'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
@@ -167,7 +169,7 @@ def loop_zapros():
                                  )
         # bot.send_message(362390015, 'проверка')
         print('     конец запроса')
-        time.sleep(10)
+        time.sleep(0)
     ENDCOMMAND = 0
 
 
@@ -252,6 +254,10 @@ def send_text(message):
                              'П1 = ' + match.get('bet1') + '\n' +
                              'П2 = ' + match.get('bet2')
                              )
+
+# @bot.channel_post_handler()
+# def channel(message):
+#     print(message.chat.id)
 
 bot.polling()
 
