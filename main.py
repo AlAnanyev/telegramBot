@@ -1,6 +1,7 @@
 import telebot
 import requests
 import time
+from telebot import types
 from bs4 import BeautifulSoup
 
 
@@ -13,11 +14,11 @@ URL = ['https://1xstavka.ru/live/Table-Tennis/2178512-Winners-League/',
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.146 Safari/537.36',
            'accept': '*/*'}
 HOST = 'https://1xstavka.ru/'
-POROGWINSET = 5  # пороговый счет в партии
-POROGKOEF = 1.4  # пороговый коэффициент
+POROGWINSET = 7  # пороговый счет в партии
+POROGKOEF = 1.2  # пороговый коэффициент
 ENDCOMMAND = 0  # команда завершения работы парсера
-SIGNAL = -1 # команда на вывод всех сигналов
-
+SIGNAL = 1  # команда на вывод всех сигналов
+PRIZNAKRABOTY = 0
 IDMEMBERS = [-1001323622532, 362390015]
 
 def get_html(url, params=None):  # реквест, получение ответа
@@ -136,7 +137,11 @@ def parse():
 
 def loop_zapros():
     global ENDCOMMAND
+    global PRIZNAKRABOTY
+    if PRIZNAKRABOTY == 1:
+        return -1
     while ENDCOMMAND != 1:
+        PRIZNAKRABOTY = 1
         print('запрос')
         matches = parse()
         for match in matches:
@@ -171,23 +176,27 @@ def loop_zapros():
         print('     конец запроса')
         time.sleep(0)
     ENDCOMMAND = 0
-
+    PRIZNAKRABOTY = 0
+    return 1
 
 bot = telebot.TeleBot('1699645072:AAGE3eWMl-spPf7vCJNphWQFQMUlz6k6D4A')
 
 
 
-@bot.message_handler(commands=['start_parcer'])
+@bot.message_handler(commands=['start_parser'])
 def start_message(message):
-    bot.send_message(message.chat.id, 'Старт работы парсера')
-    loop_zapros()
+    bot.send_message(message.chat.id, 'Запускаю парсер')
+    otvet = loop_zapros()
+    if otvet == -1:
+        bot.send_message(message.chat.id, 'Парсер уже запущен')
+    elif otvet == 1:
+        bot.send_message(message.chat.id, 'Парсер завершил работу')
 
-
-@bot.message_handler(commands=['stop_parcer'])
+@bot.message_handler(commands=['stop_parser'])
 def start_message(message):
     global ENDCOMMAND
     ENDCOMMAND = 1
-    bot.send_message(message.chat.id, 'Парсер остановлен')
+    #  bot.send_message(message.chat.id, 'Парсер остановлен')
 
 
 @bot.message_handler(commands=['vse'])
@@ -212,6 +221,37 @@ def start_message(message):
 @bot.message_handler(commands=['партия'])
 def start_message(message):
     bot.send_message(message.chat.id, 'Сейчас порог по счёту в партии = ' + str(POROGWINSET) + '. Чтобы поменять введи winset_<значение>')
+
+
+@bot.message_handler(commands=['HP'])  # вывод вспомогательных кнопок по команде /Help
+def start_message(message):
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    button_start_parser = types.InlineKeyboardButton(text='Старт работы парсера', callback_data='start_parser')
+    button_koef = types.InlineKeyboardButton(text='Текущий пороговый коэффициент', callback_data='koef')
+    button_winset = types.InlineKeyboardButton(text='Текущий порог по победам соперника в партии', callback_data='winset')
+    button_stop_parser = types.InlineKeyboardButton(text='Остановка работы парсера', callback_data='stop_parser')
+    keyboard.add(button_start_parser, button_koef, button_winset,button_stop_parser)
+    bot.send_message(message.chat.id, 'Команды', reply_markup=keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_worker(call):
+    if call.data == "koef":
+        bot.send_message(call.message.chat.id,
+                         'Сейчас порог по коэффициенту = ' + str(POROGKOEF) + '. Чтобы поменять введи koef_<значение>')
+    elif call.data == "winset":
+        bot.send_message(call.message.chat.id, 'Сейчас порог по счёту в партии = ' + str(POROGWINSET) + '. Чтобы поменять введи winset_<значение>')
+    elif call.data == 'start_parser':
+        bot.send_message(call.message.chat.id, 'Запускаю парсер')
+        otvet = loop_zapros()
+        if otvet == -1:
+            bot.send_message(call.message.chat.id, 'Парсер уже запущен')
+        elif otvet == 1:
+            bot.send_message(call.message.chat.id, 'Парсер завершил работу')
+    elif call.data == 'stop_parser':
+        global ENDCOMMAND
+        ENDCOMMAND = 1
+
 
 
 @bot.message_handler(content_types=['text'])
@@ -259,5 +299,5 @@ def send_text(message):
 # def channel(message):
 #     print(message.chat.id)
 
-bot.polling()
+bot.polling(none_stop=True)
 
