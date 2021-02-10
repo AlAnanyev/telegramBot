@@ -3,6 +3,7 @@ import requests
 import time
 from bs4 import BeautifulSoup
 
+
 URL = ['https://1xstavka.ru/live/Table-Tennis/2178512-Winners-League/',
  'https://1xstavka.ru/live/Table-Tennis/1792858-Win-Cup/',
  'https://1xstavka.ru/live/Table-Tennis/1197285-TT-Cup/',
@@ -36,6 +37,8 @@ def get_content(html):
         schetline1.remove(schetline1[0]) # убираем пустые элементы сначала
         schetline1.remove(schetline1[0])
         schetline1.remove(schetline1[0])
+        if len(schetline1) == 0:  # заплатка на отсутствие счета в первой партии
+            continue
         if len(schetline1) == 1:
             set1 = '0'
         else:
@@ -163,7 +166,7 @@ def loop_zapros():
                                  'П2 = ' + match.get('bet2')
                                  )
         # bot.send_message(362390015, 'проверка')
-        print('конец запроса')
+        print('     конец запроса')
         time.sleep(10)
     ENDCOMMAND = 0
 
