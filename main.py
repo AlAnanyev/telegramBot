@@ -3,6 +3,7 @@ import requests
 import time
 from telebot import types
 from bs4 import BeautifulSoup
+from multiprocessing import Pool
 
 
 URL = ['https://1xstavka.ru/live/Table-Tennis/2178512-Winners-League/', 'https://1xstavka.ru/live/Table-Tennis/1792858-Win-Cup/',
@@ -26,8 +27,9 @@ def get_html(url, params=None):  # реквест, получение ответ
     return r
 
 
-def get_content(html):
-    soup = BeautifulSoup(html, 'html.parser')
+def get_content(url):
+    html = get_html(url)  # получение html кода
+    soup = BeautifulSoup(html.text, 'html.parser')
     items = soup.find_all('div', class_='c-events__item c-events__item_col')
     # print(items)
     matches = []
@@ -76,19 +78,15 @@ def get_content(html):
 
 
 def proverka_na_pobedu(match):   # основная проверка матча
-
     if match.get('bet1') == '-' or match.get('bet2') == '-': # условие для коэфиц. без значений
         return -1
-
-    if float(match.get('bet1')) >= POROGKOEF:  # сравение с порогом первого коэф
-        if int(match.get('set1')) == 1 and int(match.get('set2')) == 0:   # проверка на одну победу в партии
-            if int(match.get('schetline2')[0]) <= POROGWINSET:
-                res1 = 'sledim'  # на слежение
-            else:
-                res1 = 'pas'
-        elif int(match.get('set1')) == 2 and int(match.get('set2')) == 0:  # проверка на две победы в партии
-            if int(match.get('schetline2')[0]) <= POROGWINSET and int(match.get('schetline2')[1]) <= POROGWINSET:
-                res1 = 'stavka'  # на ставку
+    if len(match.get('schetline2')) == 3:
+        if float(match.get('bet1')) >= POROGKOEF:  # сравение с порогом первого коэф
+            if int(match.get('set1')) == 2 and int(match.get('set2')) == 0:  # проверка на две победы в партии
+                if int(match.get('schetline2')[0]) <= POROGWINSET and int(match.get('schetline2')[1]) <= POROGWINSET and int(match.get('schetline2')[2]) <= 1:
+                    res1 = 'stavka'  # на ставку
+                else:
+                    res1 = 'pas'
             else:
                 res1 = 'pas'
         else:
@@ -96,15 +94,13 @@ def proverka_na_pobedu(match):   # основная проверка матча
     else:
         res1 = 'pas'
 
-    if float(match.get('bet2')) >= POROGKOEF:   # сравение с порогом второго коэф
-        if int(match.get('set2')) == 1 and int(match.get('set1')) == 0:  # проверка на одну победу в партии
-            if int(match.get('schetline1')[0]) <= POROGWINSET:
-                res2 = 'sledim'  # на слежение
-            else:
-                res2 = 'pas'
-        elif int(match.get('set2')) == 2 and int(match.get('set1')) == 0:  # проверка на две победы в партии
-            if int(match.get('schetline1')[0]) <= POROGWINSET and int(match.get('schetline1')[1]) <= POROGWINSET:
-                res2 = 'stavka'  # на ставку
+    if len(match.get('schetline1')) == 3:
+        if float(match.get('bet2')) >= POROGKOEF:  # сравение с порогом первого коэф
+            if int(match.get('set1')) == 0 and int(match.get('set2')) == 2:  # проверка на две победы в партии
+                if int(match.get('schetline1')[0]) <= POROGWINSET and int(match.get('schetline1')[1]) <= POROGWINSET and int(match.get('schetline1')[2]) <= 1:
+                    res2 = 'stavka'  # на ставку
+                else:
+                    res2 = 'pas'
             else:
                 res2 = 'pas'
         else:
@@ -112,27 +108,21 @@ def proverka_na_pobedu(match):   # основная проверка матча
     else:
         res2 = 'pas'
 
-    # возврат результатов
     if res1 == 'stavka':
         return 1
     elif res2 == 'stavka':
         return 2
-    elif res1 == 'sledim':
-        return 11
-    elif res2 == 'sledim':
-        return 22
     else:
         return -1
 
+def proverka_na_3partiu():
+    pass
+
 
 def parse():
-    matches = []  # список матчей
-    for url in URL:
-        html = get_html(url)  # получение html кода
-        if html.status_code == 200:  # получение ответа от страницы
-            mat = get_content(html.text)  # получение контента страницы
-            matches += mat   # добавление результатов в общий список
-    return matches
+    with Pool(10) as p:
+        leagues = p.map(get_content, URL)
+    return leagues
 
 
 def loop_zapros():
@@ -144,15 +134,17 @@ def loop_zapros():
         PRIZNAKRABOTY = 1
         start_time = time.time()  # старт замера времени
         print('запрос')
-        matches = parse()  # получение списка матчей
-        for match in matches:
-            result_proverki_pobeda = proverka_na_pobedu(match)
-            if SIGNAL == 1:
-                if result_proverki_pobeda == 1 or result_proverki_pobeda == 2:
-                    forma_message(match)
-            elif SIGNAL == -1:
-                if result_proverki_pobeda != -1:
-                    forma_message(match)
+        with Pool(10) as p:
+            leagues = p.map(get_content, URL)
+            for league in leagues:
+                for match in league:
+                    result_proverki_pobeda = proverka_na_pobedu(match)
+                    if SIGNAL == 1:
+                        if result_proverki_pobeda == 1 or result_proverki_pobeda == 2:
+                            forma_message(match)
+                    elif SIGNAL == -1:
+                        if result_proverki_pobeda != -1:
+                            forma_message(match)
         # bot.send_message(362390015, 'проверка')
         print('     конец запроса', "--- %s seconds ---" % (time.time() - start_time))
         time.sleep(0)  # время задержки между запросами
@@ -173,6 +165,7 @@ def forma_message(match):  # форма отправки сообщений ад
                      'П1 = ' + match.get('bet1') + '\n' +
                      'П2 = ' + match.get('bet2')
                      )
+
 
 bot = telebot.TeleBot('1699645072:AAGE3eWMl-spPf7vCJNphWQFQMUlz6k6D4A')
 
@@ -286,21 +279,24 @@ def send_text(message):
                 print(POROGWINSET)
 
     elif message.text.lower() == 'test': # тестовая ветка
-        matches = parse()
-        for match in matches:
-            bot.send_message(message.chat.id,
+        leagues = parse()
+        for league in leagues:
+            for match in league:
+                bot.send_message(message.chat.id,
                              match.get('Title') + '\n' +
                              match.get('Link') + '\n' +
                              'Cчёт по сетам: ' + match.get('set1') + '--' + match.get('set2') + '\n' +
                              'Счёт в сетах 1-го: ' + ''.join(str(e + '\t') for e in match.get('schetline1')) + '\n' +
                              'Счёт в сетах 2-го: ' + ''.join(str(e + '\t') for e in match.get('schetline2')) + '\n' +
                              'П1 = ' + match.get('bet1') + '\n' +
-                             'П2 = ' + match.get('bet2')
+                             'П2 = ' + match.get('bet2') + '\n' +
+                             'Проверка = ' + str(proverka_na_pobedu(match))
                              )
 
 # @bot.channel_post_handler()
 # def channel(message):
 #     print(message.chat.id)
 
-bot.polling(none_stop=True)
+if __name__ == '__main__':
+    bot.polling()
 
