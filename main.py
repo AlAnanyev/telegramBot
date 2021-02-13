@@ -88,6 +88,37 @@ def get_content(url):
 def proverka_na_pobedu(match):  # основная проверка матча
     if match.get('bet1') == '-' or match.get('bet2') == '-':  # условие для коэфиц. без значений
         return -1
+
+    if len(match.get('schetline2')) == 2:
+        if float(match.get('bet1')) >= POROGKOEF:  # сравение с порогом первого коэф
+            if int(match.get('set1')) == 2 and int(match.get('set2')) == 0:  # проверка на две победы в партии
+                if int(match.get('schetline2')[0]) <= POROGWINSET and int(
+                        match.get('schetline2')[1]) <= POROGWINSET:
+                    res1 = 'stavka'  # на ставку
+                else:
+                    res1 = 'pas'
+            else:
+                res1 = 'pas'
+        else:
+            res1 = 'pas'
+    else:
+        res1 = 'pas'
+
+    if len(match.get('schetline1')) == 2:
+        if float(match.get('bet2')) >= POROGKOEF:  # сравение с порогом первого коэф
+            if int(match.get('set1')) == 0 and int(match.get('set2')) == 2:  # проверка на две победы в партии
+                if int(match.get('schetline1')[0]) <= POROGWINSET and int(
+                        match.get('schetline1')[1]) <= POROGWINSET:
+                    res2 = 'stavka'  # на ставку
+                else:
+                    res2 = 'pas'
+            else:
+                res2 = 'pas'
+        else:
+            res2 = 'pas'
+    else:
+        res2 = 'pas'
+
     if len(match.get('schetline2')) == 3:
         if float(match.get('bet1')) >= POROGKOEF:  # сравение с порогом первого коэф
             if int(match.get('set1')) == 2 and int(match.get('set2')) == 0:  # проверка на две победы в партии
@@ -138,16 +169,17 @@ def parse():
 
 def stek_matchey(match):  # здесь будеть накапливаться список матчей
     global STEKMATCHEY
-    if len(STEKMATCHEY) == 0:  # список пустой
+    if len(STEKMATCHEY) == 0:  # если список пустой
         STEKMATCHEY.append(match.get('Link'))  # добавляем в список
         forma_message(match)  # выводим в канал
     else:
+        match_ne_naiden = 1 # выставляем что матч не найден
         for match_in_stek in STEKMATCHEY:  # цикл по списку
             if match_in_stek == match.get('Link'):
-                return
-            else:
-                STEKMATCHEY.append(match.get('Link'))
-                forma_message(match)
+                match_ne_naiden = 0  # матч найден
+        if match_ne_naiden:  # если матч не найден
+            STEKMATCHEY.append(match.get('Link'))  # добавляем в список
+            forma_message(match)  # выводим в канал
 
 
 # для статистики можного выводить ежедневно информацию с помощью schedule
@@ -267,6 +299,7 @@ def start_message(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
     global SIGNAL
+    global start_time_parser
     if call.data == "koef":
         bot.send_message(call.message.chat.id,
                          'Сейчас порог по коэффициенту = ' + str(POROGKOEF) + '. Чтобы поменять введи koef_<значение>')
@@ -274,7 +307,6 @@ def callback_worker(call):
         bot.send_message(call.message.chat.id, 'Сейчас порог по счёту в партии = ' + str(
             POROGWINSET) + '. Чтобы поменять введи winset_<значение>')
     elif call.data == 'start_parser':
-        global start_time_parser
         start_time_parser = time.time()
         bot.send_message(call.message.chat.id, 'Запускаю парсер')
         otvet = loop_zapros()
@@ -296,12 +328,14 @@ def callback_worker(call):
         if time_spent_mins < 60:
             bot.send_message(call.message.chat.id, "Время работы парсера: --- %s mins ---" % time_spent_mins)
         else:
-            time_spent_hours = time_spent_mins / 60;
+            time_spent_hours = time_spent_mins / 60
             bot.send_message(call.message.chat.id, "Время работы парсера: --- %s hrs ---" % time_spent_hours)
     elif call.data == 'stek':
         bot.send_message(call.message.chat.id, 'Список найденных матчей:\n')
         if len(STEKMATCHEY) != 0:
-            bot.send_message(call.message.chat.id, STEKMATCHEY)
+            for match_in_stek in STEKMATCHEY:
+                bot.send_message(call.message.chat.id, match_in_stek)
+
 
 
 @bot.message_handler(content_types=['text'])
