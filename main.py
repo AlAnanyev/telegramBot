@@ -17,7 +17,7 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
            'accept': '*/*'}
 HOST = 'https://1xstavka.ru/'
 POROGWINSET = 7  # пороговый счет в партии
-POROGKOEF = 1.4  # пороговый коэффициент
+POROGKOEF = 1.2  # пороговый коэффициент
 ENDCOMMAND = 0  # команда завершения работы парсера
 SIGNAL = 1  # команда на вывод только на победу
 PRIZNAKRABOTY = 0  # признак работы
@@ -32,11 +32,13 @@ def get_html(url, params=None):  # реквест, получение ответ
 
 
 def get_content(url):
+    matches = []
     html = get_html(url)  # получение html кода
+    if html.status_code != 200:
+        return matches
     soup = BeautifulSoup(html.text, 'html.parser')
     items = soup.find_all('div', class_='c-events__item c-events__item_col')
     # print(items)
-    matches = []
     for item in items:
         # проверка матча на правильную лигу
         match_url = item.find('a', class_='c-events__name').get('href')
@@ -232,25 +234,25 @@ bot = telebot.TeleBot('1699645072:AAGE3eWMl-spPf7vCJNphWQFQMUlz6k6D4A')
 
 # Далее описание работы телеграмм бота
 
-@bot.message_handler(commands=['start_parser'])
-def start_message(message):
-    bot.send_message(message.chat.id, 'Запускаю парсер')
-    global start_time_parser
-    start_time_parser = time.time()
-    otvet = loop_zapros()
-    if otvet == -1:
-        bot.send_message(message.chat.id, 'Парсер уже запущен')
-    elif otvet == 1:
-        print('     конец работы парсера', "--- %s seconds ---" % (time.time() - start_time_parser))
-        bot.send_message(message.chat.id,
-                         'Парсер завершил работу --- %s seconds ---' % (time.time() - start_time_parser))
-
-
-@bot.message_handler(commands=['stop_parser'])
-def start_message(message):
-    global ENDCOMMAND
-    ENDCOMMAND = 1  # установка команды на окончание работы парсера
-    #  bot.send_message(message.chat.id, 'Парсер остановлен')
+# @bot.message_handler(commands=['start_parser'])
+# def start_message(message):
+#     bot.send_message(message.chat.id, 'Запускаю парсер')
+#     global start_time_parser
+#     start_time_parser = time.time()
+#     otvet = loop_zapros()
+#     if otvet == -1:
+#         bot.send_message(message.chat.id, 'Парсер уже запущен')
+#     elif otvet == 1:
+#         print('     конец работы парсера', "--- %s seconds ---" % (time.time() - start_time_parser))
+#         bot.send_message(message.chat.id,
+#                          'Парсер завершил работу --- %s seconds ---' % (time.time() - start_time_parser))
+#
+#
+# @bot.message_handler(commands=['stop_parser'])
+# def start_message(message):
+#     global ENDCOMMAND
+#     ENDCOMMAND = 1  # установка команды на окончание работы парсера
+#     #  bot.send_message(message.chat.id, 'Парсер остановлен')
 
 
 @bot.message_handler(commands=['vse'])
@@ -309,6 +311,7 @@ def callback_worker(call):
     elif call.data == 'start_parser':
         start_time_parser = time.time()
         bot.send_message(call.message.chat.id, 'Запускаю парсер')
+        # тут ловушка для исключений
         otvet = loop_zapros()
         if otvet == -1:
             bot.send_message(call.message.chat.id, 'Парсер уже запущен')
