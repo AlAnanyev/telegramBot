@@ -196,7 +196,7 @@ def loop_zapros():
         PRIZNAKRABOTY = 1
         start_time = time.time()  # старт замера времени
         print('запрос')
-        with Pool(10) as p:
+        with Pool(20) as p:
             try:
                 leagues = p.map(get_content, URL)
             except Exception:
@@ -297,10 +297,9 @@ def start_message(message):
     button_na_stavku = types.InlineKeyboardButton(text='Вывод матчей на ставку', callback_data='stavka')
     button_na_time = types.InlineKeyboardButton(text='Вывод времени работы парсера', callback_data='time_spent')
     button_na_stek = types.InlineKeyboardButton(text='Вывод текущего стека найденных матчей', callback_data='stek')
-    button_na_quit = types.InlineKeyboardButton(text='Выключить программу', callback_data='quit')
 
     keyboard.add(button_start_parser, button_koef, button_winset, button_stop_parser, button_vse_match,
-                 button_na_stavku, button_na_time, button_na_stek, button_na_quit)  # добавление кнопок в окно
+                 button_na_stavku, button_na_time, button_na_stek)  # добавление кнопок в окно
     bot.send_message(message.chat.id, 'Команды', reply_markup=keyboard)
 
 
@@ -344,8 +343,8 @@ def callback_worker(call):
         if len(STEKMATCHEY) != 0:
             for match_in_stek in STEKMATCHEY:
                 bot.send_message(call.message.chat.id, match_in_stek)
-    elif call.data == 'quit':
-        raise SystemExit
+
+
 
 
 
