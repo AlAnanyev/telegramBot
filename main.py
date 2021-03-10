@@ -197,7 +197,11 @@ def loop_zapros():
         start_time = time.time()  # старт замера времени
         print('запрос')
         with Pool(10) as p:
-            leagues = p.map(get_content, URL)
+            try:
+                leagues = p.map(get_content, URL)
+            except Exception:
+                leagues = []
+                time.sleep(5)
             for league in leagues:
                 for match in league:
                     result_proverki_pobeda = proverka_na_pobedu(match)
@@ -313,6 +317,7 @@ def callback_worker(call):
         bot.send_message(call.message.chat.id, 'Запускаю парсер')
         # тут ловушка для исключений
         otvet = loop_zapros()
+
         if otvet == -1:
             bot.send_message(call.message.chat.id, 'Парсер уже запущен')
         elif otvet == 1:
