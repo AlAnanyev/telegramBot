@@ -33,7 +33,7 @@ def get_html(url, params=None):  # реквест, получение ответ
 
 def get_content(url):
     matches = []
-    html = get_html(url)  # получение html кода
+    html = get_hztml(url)  # получение html кода
     if html.status_code != 200:
         return matches
     soup = BeautifulSoup(html.text, 'html.parser')
@@ -297,8 +297,10 @@ def start_message(message):
     button_na_stavku = types.InlineKeyboardButton(text='Вывод матчей на ставку', callback_data='stavka')
     button_na_time = types.InlineKeyboardButton(text='Вывод времени работы парсера', callback_data='time_spent')
     button_na_stek = types.InlineKeyboardButton(text='Вывод текущего стека найденных матчей', callback_data='stek')
+    button_na_quit = types.InlineKeyboardButton(text='Выключить программу', callback_data='quit')
+
     keyboard.add(button_start_parser, button_koef, button_winset, button_stop_parser, button_vse_match,
-                 button_na_stavku, button_na_time, button_na_stek)  # добавление кнопок в окно
+                 button_na_stavku, button_na_time, button_na_stek, button_na_quit)  # добавление кнопок в окно
     bot.send_message(message.chat.id, 'Команды', reply_markup=keyboard)
 
 
@@ -317,7 +319,6 @@ def callback_worker(call):
         bot.send_message(call.message.chat.id, 'Запускаю парсер')
         # тут ловушка для исключений
         otvet = loop_zapros()
-
         if otvet == -1:
             bot.send_message(call.message.chat.id, 'Парсер уже запущен')
         elif otvet == 1:
@@ -343,6 +344,8 @@ def callback_worker(call):
         if len(STEKMATCHEY) != 0:
             for match_in_stek in STEKMATCHEY:
                 bot.send_message(call.message.chat.id, match_in_stek)
+    elif call.data == 'quit':
+        quit()
 
 
 
