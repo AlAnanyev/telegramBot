@@ -345,7 +345,7 @@ def callback_worker(call):
             for match_in_stek in STEKMATCHEY:
                 bot.send_message(call.message.chat.id, match_in_stek)
     elif call.data == 'quit':
-        quit()
+        raise SystemExit
 
 
 
