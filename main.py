@@ -33,7 +33,7 @@ def get_html(url, params=None):  # реквест, получение ответ
 
 def get_content(url):
     matches = []
-    html = get_hztml(url)  # получение html кода
+    html = get_html(url)  # получение html кода
     if html.status_code != 200:
         return matches
     soup = BeautifulSoup(html.text, 'html.parser')
